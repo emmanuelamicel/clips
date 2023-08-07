@@ -1,10 +1,11 @@
 require('dotenv').config()
+const path = require('path')
 const express = require('express')
 const session = require('express-session')
 const passport = require('passport')
 const { Strategy: OAuth2Strategy } = require('passport-oauth2')
 
-const routes = require('./routes')
+const routes = require('./src/routes')
 
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID
 const TWITCH_SECRET = process.env.TWITCH_SECRET
@@ -12,6 +13,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET
 const CALLBACK_URL = process.env.CALLBACK_URL
 
 const app = express()
+
 app.use(session({ secret: SESSION_SECRET, resave: false, saveUninitialized: false }))
 app.use(passport.initialize())
 app.use(passport.session())
@@ -64,14 +66,6 @@ function ensureAuthenticated(req, res, next) {
 
 app.use(ensureAuthenticated)
 
-app.get('/', function (req, res) {
-  if (req.session && req.session.passport && req.session.passport.user) {
-    res.send(req.session.passport.user)
-  } else {
-    res.send('<html><head><title>Twitch Auth Sample</title></head><a href="/auth/twitch">Authenticate</a></html>')
-  }
-})
-
 app.get('/profile', async function (req, res) {
   const accessToken = req.session.passport.user.profile.accessToken
   try {
@@ -97,10 +91,20 @@ app.get('/clips', async function (req, res) {
     let clips = await Promise.all(clipPromises)
     let allClips = [].concat(...clips.map(clipData => clipData.data))
 
+    // TODO: add parameters to order clips
+    allClips.sort((a, b) => a.view_count < b.view_count ? 1 : -1)
+
     res.send(allClips)
   } catch (err) {
     res.status(500).send(err)
   }
+})
+
+app.use(express.static(path.join(__dirname, 'public')))
+
+app.get('/', function (req, res) {
+  console.log(req.session.passport.user)
+  res.sendFile(path.join(__dirname, 'public', 'index.html'))
 })
 
 app.listen(3000, function () {
